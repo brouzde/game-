@@ -1,0 +1,2472 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>Speed Racer - Highway Storm</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --road-color: #1e293b;
+      --road-line: #facc15;
+      --hud-text: #f8fafc;
+      --accent-cyan: #06b6d4;
+      --accent-red: #ef4444;
+      --accent-green: #22c55e;
+      --accent-gold: #fbbf24;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-color);
+      font-family: var(--font-family);
+      color: var(--hud-text);
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0a0f1d 100%);
+    }
+
+    #game-canvas {
+      display: block;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      background-color: #141c2e;
+    }
+
+    /* HUD Elements Layer */
+    #hud {
+      position: absolute;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 14px 16px;
+      box-sizing: border-box;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .hud-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .hud-card .hud-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #94a3b8;
+      margin-bottom: 2px;
+    }
+
+    .hud-value {
+      font-variant-numeric: tabular-nums;
+      font-size: 16px;
+    }
+
+    .hud-val-score { color: var(--accent-gold); }
+    .hud-val-speed { color: var(--accent-cyan); }
+    .hud-val-dist { color: #e2e8f0; }
+    .hud-val-coins { color: #f59e0b; display: flex; align-items: center; gap: 4px; }
+
+    .health-bar-container {
+      width: 90px;
+      height: 10px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 4px;
+      position: relative;
+    }
+
+    .health-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #22c55e, #10b981);
+      transition: width 0.15s ease, background 0.2s;
+    }
+
+    .health-bar-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+
+    .nitro-indicator {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(6, 182, 212, 0.25);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      margin-top: 4px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .nitro-active {
+      opacity: 1;
+      animation: pulse-glow 0.6s infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+      0% { box-shadow: 0 0 4px #06b6d4; }
+      100% { box-shadow: 0 0 14px #38bdf8; }
+    }
+
+    .hud-top-right {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s, background 0.2s;
+      outline: none;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.92);
+      background: rgba(51, 65, 85, 0.9);
+    }
+
+    /* Virtual Touch Controls */
+    #touch-controls {
+      position: absolute;
+      pointer-events: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 16px 20px 24px;
+      box-sizing: border-box;
+      touch-action: none;
+    }
+
+    .touch-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .touch-btn {
+      width: 62px;
+      height: 62px;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      color: #f8fafc;
+      font-size: 20px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      transition: background 0.1s, transform 0.08s, border-color 0.1s;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+
+    .touch-btn:active, .touch-btn.active {
+      background: rgba(30, 41, 59, 0.95);
+      transform: scale(0.92);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(6, 182, 212, 0.5);
+    }
+
+    .touch-btn.gas {
+      background: rgba(34, 197, 94, 0.25);
+      border-color: rgba(34, 197, 94, 0.5);
+      font-size: 13px;
+      color: #86efac;
+    }
+
+    .touch-btn.gas:active, .touch-btn.gas.active {
+      background: rgba(34, 197, 94, 0.6);
+      border-color: #22c55e;
+      box-shadow: 0 0 16px rgba(34, 197, 94, 0.6);
+    }
+
+    .touch-btn.brake {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: rgba(239, 68, 68, 0.5);
+      font-size: 11px;
+      color: #fca5a5;
+    }
+
+    .touch-btn.brake:active, .touch-btn.brake.active {
+      background: rgba(239, 68, 68, 0.6);
+      border-color: #ef4444;
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
+    }
+
+    /* Modal Layer */
+    #modal-layer {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 29, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+      transition: opacity 0.2s ease;
+      overflow-y: auto;
+    }
+
+    #modal-layer.hidden {
+      display: none;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 440px;
+      max-height: 92vh;
+      overflow-y: auto;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 22px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      animation: pop-in 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .modal-card::-webkit-scrollbar {
+      width: 6px;
+    }
+    .modal-card::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
+
+    @keyframes pop-in {
+      0% { transform: scale(0.85); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #38bdf8, #facc15);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .modal-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+
+    .modal-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .stat-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .stat-box .lbl {
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .stat-box .val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #f8fafc;
+    }
+
+    .primary-btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7, #06b6d4);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4);
+      transition: transform 0.1s, box-shadow 0.2s, filter 0.2s;
+      outline: none;
+    }
+
+    .primary-btn:active {
+      transform: scale(0.97);
+      filter: brightness(1.1);
+    }
+
+    .gold-btn {
+      background: linear-gradient(135deg, #d97706, #f59e0b);
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    }
+
+    .secondary-btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #f8fafc;
+    }
+
+    .controls-hint {
+      margin-top: 14px;
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    /* Garage & Shop Styles */
+    .garage-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .garage-coins {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(251, 191, 36, 0.15);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+
+    .cars-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    .car-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 12px;
+      transition: border-color 0.2s, transform 0.15s;
+      position: relative;
+    }
+
+    .car-card.selected {
+      border-color: #38bdf8;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .car-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .car-card-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .car-tag {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .car-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+
+    .car-stats-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+      margin-bottom: 10px;
+    }
+
+    .stat-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-row-label {
+      font-size: 9px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .stat-meter {
+      height: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .stat-meter-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    .meter-speed { background: #38bdf8; }
+    .meter-accel { background: #34d399; }
+    .meter-armor { background: #fb923c; }
+    .meter-handling { background: #a78bfa; }
+
+    .car-action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .car-price {
+      font-size: 14px;
+      font-weight: 800;
+      color: #f59e0b;
+    }
+
+    .car-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+    }
+
+    .car-btn-buy {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+    }
+
+    .car-btn-select {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    .car-btn-active {
+      background: #10b981;
+      color: #fff;
+      cursor: default;
+    }
+
+    .car-btn:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Игровой мир -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hud-top">
+        <div class="hud-card">
+          <span class="hud-label">Счет</span>
+          <span class="hud-value hud-val-score" id="hud-score">0</span>
+        </div>
+
+        <div class="hud-card">
+          <span class="hud-label">Монеты</span>
+          <span class="hud-value hud-val-coins">🪙 <span id="hud-coins">0</span></span>
+        </div>
+
+        <div class="hud-card">
+          <span class="hud-label">Скорость</span>
+          <span class="hud-value hud-val-speed"><span id="hud-speed">0</span> <small style="font-size:10px;">км/ч</small></span>
+          <div class="nitro-indicator" id="hud-nitro">⚡ NITRO ⚡</div>
+        </div>
+
+        <div class="hud-card">
+          <span class="hud-label">Дистанция</span>
+          <span class="hud-value hud-val-dist"><span id="hud-distance">0</span> <small style="font-size:10px;">м</small></span>
+        </div>
+
+        <div class="hud-card">
+          <span class="hud-label">Прочность</span>
+          <div class="health-bar-container">
+            <div class="health-bar-fill" id="hud-health"></div>
+            <div class="health-bar-text" id="hud-health-txt">100/100</div>
+          </div>
+        </div>
+
+        <div class="hud-top-right">
+          <button class="icon-btn" id="sound-btn" aria-label="Звук">🔊</button>
+          <button class="icon-btn" id="pause-btn" aria-label="Пауза">⏸</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Виртуальные кнопки управления для мобильных -->
+    <div id="touch-controls">
+      <div class="touch-group">
+        <button class="touch-btn" id="btn-left" aria-label="Влево">◄</button>
+        <button class="touch-btn" id="btn-right" aria-label="Вправо">►</button>
+      </div>
+      <div class="touch-group">
+        <button class="touch-btn brake" id="btn-brake" aria-label="Тормоз">BRAKE</button>
+        <button class="touch-btn gas" id="btn-gas" aria-label="Газ">GAS</button>
+      </div>
+    </div>
+
+    <!-- Модальный слой: Меню, Пауза, Game Over -->
+    <div id="modal-layer">
+      <div class="modal-card" id="modal-content">
+        <!-- Заполняется динамически State Machine -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       МОДУЛЬ 1: CONFIG & CONSTANTS
+       ========================================================================== */
+    const CONFIG = {
+      V_WIDTH: 480,
+      V_HEIGHT: 800,
+      ASPECT_RATIO: 480 / 800,
+      ROAD: {
+        LANES: 4,
+        LANE_WIDTH: 90,
+        ROAD_WIDTH: 360,
+        SHOULDER_WIDTH: 60,
+        DASH_LENGTH: 60,
+        DASH_GAP: 40
+      },
+      PLAYER: {
+        WIDTH: 44,
+        HEIGHT: 84,
+        START_X: 218, // (CONFIG.V_WIDTH - 44)/2
+        START_Y: 650,
+        BASE_SPEED: 180, // px/sec
+        MAX_SPEED: 520,  // px/sec
+        ACCELERATION: 180,
+        INERTIA: 140,    // deceleration
+        LATERAL_SPEED: 320,
+        MAX_TILT: 0.12,   // ~7 градусов крена кузова
+        MAX_HEALTH: 100
+      },
+      TRAFFIC: {
+        SPAWN_INTERVAL_MIN: 1.1,
+        SPAWN_INTERVAL_MAX: 2.2,
+        MIN_LANE_DIST: 230,
+        TYPES: [
+          { type: 'sedan', width: 44, height: 82, speedMin: 120, speedMax: 200, color: '#3b82f6', canChangeLane: true },
+          { type: 'truck', width: 50, height: 120, speedMin: 80, speedMax: 130, color: '#e2e8f0', canChangeLane: false },
+          { type: 'sport', width: 44, height: 80, speedMin: 220, speedMax: 320, color: '#f43f5e', canChangeLane: false }
+        ]
+      },
+      PICKUPS: {
+        WIDTH: 32,
+        HEIGHT: 32,
+        SPAWN_INTERVAL_MIN: 2.8,
+        SPAWN_INTERVAL_MAX: 4.8,
+        COIN_SCORE: 100,
+        NITRO_DURATION: 4.0,
+        NITRO_SPEED_BOOST: 180
+      },
+      POOL_SIZES: {
+        PARTICLES: 100
+      },
+      SAVE_KEY: 'speed_racer_save_v2'
+    };
+
+    /* ==========================================================================
+       КАТАЛОГ АВТОМОБИЛЕЙ (АРХЕТИПЫ И КЛАССЫ)
+       ========================================================================== */
+    const CARS = [
+      {
+        id: 'starter',
+        name: 'Street Falcon',
+        title: 'Базовый Стриткар',
+        tag: 'Базовый',
+        tagColor: '#38bdf8',
+        tagBg: 'rgba(56, 189, 248, 0.2)',
+        desc: 'Надежный городской хэтчбек. Сбалансирован для новичков, бесплатный.',
+        price: 0,
+        maxSpeed: 510,
+        acceleration: 185,
+        handling: 320,
+        maxHealth: 100,
+        armor: 1.0, // стандартный урон 1.0x
+        bodyColor: '#0284c7',
+        accentColor: '#38bdf8',
+        roofColor: '#0369a1',
+        style: 'sedan'
+      },
+      {
+        id: 'glass_cannon',
+        name: 'Neon Phantom',
+        title: 'Стеклянная Пушка',
+        tag: 'Скорость',
+        tagColor: '#ec4899',
+        tagBg: 'rgba(236, 72, 153, 0.2)',
+        desc: 'Безумный разгон и максимальная скорость. Но малейший удар критичен!',
+        price: 350,
+        maxSpeed: 640,
+        acceleration: 270,
+        handling: 380,
+        maxHealth: 70,
+        armor: 1.6, // уязвимый: +60% урона
+        bodyColor: '#db2777',
+        accentColor: '#f472b6',
+        roofColor: '#831843',
+        style: 'speedster'
+      },
+      {
+        id: 'tank',
+        name: 'Ironclad Titan',
+        title: 'Тяжеловес Танк',
+        tag: 'Танк',
+        tagColor: '#f97316',
+        tagBg: 'rgba(249, 115, 22, 0.2)',
+        desc: 'Тяжелый бронеавтомобиль. Разгоняется неторопливо, но таранит помехи почти без урона.',
+        price: 500,
+        maxSpeed: 440,
+        acceleration: 135,
+        handling: 270,
+        maxHealth: 180,
+        armor: 0.35, // броня: -65% урона
+        bodyColor: '#475569',
+        accentColor: '#ea580c',
+        roofColor: '#334155',
+        style: 'armored'
+      },
+      {
+        id: 'balanced_gt',
+        name: 'Vortex GT',
+        title: 'Сбалансированный GT',
+        tag: 'Баланс+',
+        tagColor: '#10b981',
+        tagBg: 'rgba(16, 185, 129, 0.2)',
+        desc: 'Спортивное купе высшего класса: повышенная скорость, маневренность и прочный кузов.',
+        price: 750,
+        maxSpeed: 560,
+        acceleration: 220,
+        handling: 340,
+        maxHealth: 120,
+        armor: 0.75, // броня: -25% урона
+        bodyColor: '#059669',
+        accentColor: '#34d399',
+        roofColor: '#064e3b',
+        style: 'gt'
+      },
+      {
+        id: 'hypercar',
+        name: 'Chimera Apex',
+        title: 'Элитный Гиперкар',
+        tag: 'Суперкар',
+        tagColor: '#fbbf24',
+        tagBg: 'rgba(251, 191, 36, 0.25)',
+        desc: 'Венец инженерной мысли: запредельная скорость, титановый монокок и золотой аэродинамический обвес.',
+        price: 1200,
+        maxSpeed: 670,
+        acceleration: 280,
+        handling: 390,
+        maxHealth: 140,
+        armor: 0.6, // броня: -40% урона
+        bodyColor: '#7c3aed',
+        accentColor: '#fbbf24',
+        roofColor: '#4c1d95',
+        style: 'hyper'
+      }
+    ];
+
+    /* ==========================================================================
+       МОДУЛЬ 7 (ЧАСТЬ 1): STORAGE
+       ========================================================================== */
+    const Storage = {
+      data: {
+        highScore: 0,
+        totalCoins: 0,
+        soundEnabled: true,
+        controlType: 'buttons',
+        ownedCars: ['starter'],
+        selectedCar: 'starter'
+      },
+      init() {
+        try {
+          const raw = localStorage.getItem(CONFIG.SAVE_KEY);
+          if (raw) {
+            this.data = Object.assign(this.data, JSON.parse(raw));
+            if (!this.data.ownedCars || !this.data.ownedCars.includes('starter')) {
+              this.data.ownedCars = ['starter'];
+            }
+            if (!this.data.selectedCar) {
+              this.data.selectedCar = 'starter';
+            }
+          }
+        } catch (e) {
+          console.warn('Storage unavailable', e);
+        }
+      },
+      save() {
+        try {
+          localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(this.data));
+        } catch (e) {
+          console.warn('Storage save failed', e);
+        }
+      },
+      getSelectedCar() {
+        const found = CARS.find(c => c.id === this.data.selectedCar);
+        return found || CARS[0];
+      }
+    };
+    Storage.init();
+
+    /* ==========================================================================
+       МОДУЛЬ 2: VIEWPORT & CANVAS SCALER
+       ========================================================================== */
+    const CanvasScaler = {
+      canvas: document.getElementById('game-canvas'),
+      ctx: null,
+      scale: 1,
+      dpr: 1,
+      width: 0,
+      height: 0,
+      hudEl: document.getElementById('hud'),
+      touchControlsEl: document.getElementById('touch-controls'),
+
+      init() {
+        this.ctx = this.canvas.getContext('2d');
+        window.addEventListener('resize', () => this.resize());
+        this.resize();
+      },
+
+      resize() {
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        // Letterboxing: Fit 480x800 into current window
+        this.scale = Math.min(winW / CONFIG.V_WIDTH, winH / CONFIG.V_HEIGHT);
+        
+        const cssW = Math.round(CONFIG.V_WIDTH * this.scale);
+        const cssH = Math.round(CONFIG.V_HEIGHT * this.scale);
+
+        this.canvas.style.width = cssW + 'px';
+        this.canvas.style.height = cssH + 'px';
+
+        this.width = Math.round(cssW * this.dpr);
+        this.height = Math.round(cssH * this.dpr);
+
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+
+        // Position overlay HUD & touch controls directly over canvas bounds
+        const updateOverlay = (el) => {
+          if (!el) return;
+          el.style.width = cssW + 'px';
+          el.style.height = cssH + 'px';
+          el.style.left = Math.round((winW - cssW) / 2) + 'px';
+          el.style.top = Math.round((winH - cssH) / 2) + 'px';
+        };
+        updateOverlay(this.hudEl);
+        updateOverlay(this.touchControlsEl);
+      },
+
+      applyTransform() {
+        const s = this.scale * this.dpr;
+        this.ctx.setTransform(s, 0, 0, s, 0, 0);
+      }
+    };
+
+    /* ==========================================================================
+       МОДУЛЬ 3: SOUND ENGINE (Web Audio API)
+       ========================================================================== */
+    const SoundEngine = {
+      ctx: null,
+      engineGain: null,
+      engineOsc: null,
+      initialized: false,
+
+      init() {
+        if (this.initialized) return;
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          this.ctx = new AudioContextClass();
+          this.setupEngineChannel();
+          this.initialized = true;
+        } catch (e) {
+          console.warn('AudioContext error', e);
+        }
+      },
+
+      resume() {
+        if (!this.initialized) this.init();
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      },
+
+      setupEngineChannel() {
+        if (!this.ctx) return;
+        // Engine sound: Sawtooth -> LowPass (1200Hz) -> Gain
+        this.engineOsc = this.ctx.createOscillator();
+        this.engineOsc.type = 'sawtooth';
+        this.engineOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1200, this.ctx.currentTime);
+
+        this.engineGain = this.ctx.createGain();
+        this.engineGain.gain.setValueAtTime(0, this.ctx.currentTime);
+
+        this.engineOsc.connect(filter);
+        filter.connect(this.engineGain);
+        this.engineGain.connect(this.ctx.destination);
+        this.engineOsc.start();
+      },
+
+      updateEnginePitch(speedRatio, isPlaying) {
+        if (!this.ctx || !this.engineOsc || !Storage.data.soundEnabled || !isPlaying) {
+          if (this.engineGain) this.engineGain.gain.setValueAtTime(0, this.ctx ? this.ctx.currentTime : 0);
+          return;
+        }
+        // Frequency f = 45Hz .. 140Hz
+        const f = 45 + speedRatio * 95;
+        this.engineOsc.frequency.setTargetAtTime(f, this.ctx.currentTime, 0.05);
+        this.engineGain.gain.setTargetAtTime(0.12, this.ctx.currentTime, 0.05);
+      },
+
+      playCrash() {
+        if (!this.ctx || !Storage.data.soundEnabled) return;
+        this.resume();
+        const t = this.ctx.currentTime;
+        const dur = 0.6;
+        const bufferSize = this.ctx.sampleRate * dur;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(800, t);
+        filter.Q.setValueAtTime(1.5, t);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(t);
+      },
+
+      playPickup() {
+        if (!this.ctx || !Storage.data.soundEnabled) return;
+        this.resume();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        // Arpeggio 520Hz -> 780Hz
+        osc.frequency.setValueAtTime(520, t);
+        osc.frequency.exponentialRampToValueAtTime(780, t + 0.12);
+
+        gain.gain.setValueAtTime(0.25, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.2);
+      },
+
+      playNitro() {
+        if (!this.ctx || !Storage.data.soundEnabled) return;
+        this.resume();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, t);
+        osc.frequency.exponentialRampToValueAtTime(950, t + 0.35);
+
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.38);
+      }
+    };
+
+    /* ==========================================================================
+       МОДУЛЬ 4: INPUT MANAGER
+       ========================================================================== */
+    const InputManager = {
+      keys: {
+        left: false,
+        right: false,
+        gas: false,
+        brake: false
+      },
+
+      init() {
+        const unlockAudio = () => {
+          SoundEngine.resume();
+          window.removeEventListener('pointerdown', unlockAudio);
+          window.removeEventListener('keydown', unlockAudio);
+        };
+        window.addEventListener('pointerdown', unlockAudio, { passive: true });
+        window.addEventListener('keydown', unlockAudio, { passive: true });
+
+        // Keyboard listeners
+        window.addEventListener('keydown', (e) => this.onKeyDown(e));
+        window.addEventListener('keyup', (e) => this.onKeyUp(e));
+
+        // Touch button listeners with setPointerCapture
+        this.bindTouchButton('btn-left', 'left');
+        this.bindTouchButton('btn-right', 'right');
+        this.bindTouchButton('btn-gas', 'gas');
+        this.bindTouchButton('btn-brake', 'brake');
+
+        // Tap/Swipe on Canvas
+        const canvas = CanvasScaler.canvas;
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener('pointerdown', (e) => {
+          canvas.setPointerCapture(e.pointerId);
+          touchStartX = e.clientX;
+          touchStartY = e.clientY;
+          // Tap left/right side on game canvas
+          const rect = canvas.getBoundingClientRect();
+          const relX = e.clientX - rect.left;
+          if (relX < rect.width * 0.4) this.keys.left = true;
+          else if (relX > rect.width * 0.6) this.keys.right = true;
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+          if (!touchStartY) return;
+          const dy = e.clientY - touchStartY;
+          if (dy < -30) {
+            this.keys.gas = true;
+            this.keys.brake = false;
+          } else if (dy > 30) {
+            this.keys.brake = true;
+            this.keys.gas = false;
+          }
+        });
+
+        const resetCanvasTouch = () => {
+          touchStartX = 0;
+          touchStartY = 0;
+          this.keys.left = false;
+          this.keys.right = false;
+          this.keys.gas = false;
+          this.keys.brake = false;
+        };
+
+        canvas.addEventListener('pointerup', resetCanvasTouch);
+        canvas.addEventListener('pointercancel', resetCanvasTouch);
+      },
+
+      bindTouchButton(elemId, keyName) {
+        const btn = document.getElementById(elemId);
+        if (!btn) return;
+
+        btn.addEventListener('pointerdown', (e) => {
+          btn.setPointerCapture(e.pointerId);
+          btn.classList.add('active');
+          this.keys[keyName] = true;
+        });
+
+        const release = (e) => {
+          try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
+          btn.classList.remove('active');
+          this.keys[keyName] = false;
+        };
+
+        btn.addEventListener('pointerup', release);
+        btn.addEventListener('pointercancel', release);
+        btn.addEventListener('pointerleave', release);
+      },
+
+      onKeyDown(e) {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = true;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = true;
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') this.keys.gas = true;
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') this.keys.brake = true;
+
+        if (e.code === 'Escape' || e.code === 'Space') {
+          e.preventDefault();
+          GameFSM.togglePause();
+        }
+      },
+
+      onKeyUp(e) {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = false;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = false;
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') this.keys.gas = false;
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') this.keys.brake = false;
+      },
+
+      reset() {
+        this.keys.left = false;
+        this.keys.right = false;
+        this.keys.gas = false;
+        this.keys.brake = false;
+      }
+    };
+
+    /* ==========================================================================
+       МОДУЛЬ 5: MATH, COLLISION & OBJECT POOLING
+       ========================================================================== */
+    function checkCollision(a, b) {
+      const insetX = 6;
+      const insetY = 8;
+      return (
+        a.x + insetX < b.x + b.width - insetX &&
+        a.x + a.width - insetX > b.x + insetX &&
+        a.y + insetY < b.y + b.height - insetY &&
+        a.y + a.height - insetY > b.y + insetY
+      );
+    }
+
+    // Particle Object Pool to avoid GC stutter
+    const ParticlePool = {
+      pool: [],
+
+      init() {
+        this.pool = new Array(CONFIG.POOL_SIZES.PARTICLES);
+        for (let i = 0; i < CONFIG.POOL_SIZES.PARTICLES; i++) {
+          this.pool[i] = {
+            active: false,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            life: 0,
+            maxLife: 1,
+            size: 4,
+            color: '#fff',
+            alpha: 1
+          };
+        }
+      },
+
+      spawn(x, y, vx, vy, life, size, color) {
+        for (let i = 0; i < this.pool.length; i++) {
+          const p = this.pool[i];
+          if (!p.active) {
+            p.active = true;
+            p.x = x;
+            p.y = y;
+            p.vx = vx;
+            p.vy = vy;
+            p.life = 0;
+            p.maxLife = life;
+            p.size = size;
+            p.color = color;
+            p.alpha = 1;
+            return p;
+          }
+        }
+        return null;
+      },
+
+      spawnExplosion(x, y, count = 25) {
+        const colors = ['#f97316', '#ef4444', '#facc15', '#ffffff', '#64748b'];
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 40 + Math.random() * 220;
+          this.spawn(
+            x,
+            y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            0.3 + Math.random() * 0.5,
+            3 + Math.random() * 6,
+            colors[Math.floor(Math.random() * colors.length)]
+          );
+        }
+      },
+
+      spawnTireSmoke(x, y) {
+        this.spawn(
+          x + (Math.random() - 0.5) * 8,
+          y,
+          (Math.random() - 0.5) * 20,
+          30 + Math.random() * 30,
+          0.2 + Math.random() * 0.2,
+          3 + Math.random() * 4,
+          'rgba(203, 213, 225, 0.4)'
+        );
+      },
+
+      update(dt) {
+        for (let i = 0; i < this.pool.length; i++) {
+          const p = this.pool[i];
+          if (p.active) {
+            p.life += dt;
+            if (p.life >= p.maxLife) {
+              p.active = false;
+            } else {
+              p.x += p.vx * dt;
+              p.y += p.vy * dt;
+              p.alpha = 1 - (p.life / p.maxLife);
+            }
+          }
+        }
+      },
+
+      draw(ctx) {
+        for (let i = 0; i < this.pool.length; i++) {
+          const p = this.pool[i];
+          if (p.active) {
+            ctx.save();
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * (1 - p.life / p.maxLife * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+      },
+
+      clear() {
+        for (let i = 0; i < this.pool.length; i++) {
+          this.pool[i].active = false;
+        }
+      }
+    };
+    ParticlePool.init();
+
+    /* ==========================================================================
+       МОДУЛЬ 6: ENTITY MODELS
+       ========================================================================== */
+
+    // 1. Road Entity
+    const Road = {
+      offsetY: 0,
+      curbOffset: 0,
+
+      update(dt, speed) {
+        const period = CONFIG.ROAD.DASH_LENGTH + CONFIG.ROAD.DASH_GAP;
+        this.offsetY = (this.offsetY + speed * dt) % period;
+        this.curbOffset = (this.curbOffset + speed * dt) % 40;
+      },
+
+      draw(ctx) {
+        const vw = CONFIG.V_WIDTH;
+        const vh = CONFIG.V_HEIGHT;
+        const r = CONFIG.ROAD;
+
+        // Shoulder Grass/Edge
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, vw, vh);
+
+        // Curbs (Red-White alternating bands on edges)
+        const curbWidth = 14;
+        const leftCurbX = r.SHOULDER_WIDTH - curbWidth;
+        const rightCurbX = r.SHOULDER_WIDTH + r.ROAD_WIDTH;
+
+        for (let y = -40; y < vh + 40; y += 40) {
+          const actualY = y + (this.curbOffset % 40);
+          ctx.fillStyle = ((Math.floor((actualY - this.curbOffset) / 40)) % 2 === 0) ? '#ef4444' : '#f8fafc';
+          ctx.fillRect(leftCurbX, actualY, curbWidth, 20);
+          ctx.fillRect(rightCurbX, actualY, curbWidth, 20);
+        }
+
+        // Asphalt
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(r.SHOULDER_WIDTH, 0, r.ROAD_WIDTH, vh);
+
+        // Road Side Borders (Solid White)
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(r.SHOULDER_WIDTH, 0, 4, vh);
+        ctx.fillRect(r.SHOULDER_WIDTH + r.ROAD_WIDTH - 4, 0, 4, vh);
+
+        // Lane Divider Dashes
+        ctx.fillStyle = '#facc15';
+        const period = r.DASH_LENGTH + r.DASH_GAP;
+        for (let i = 1; i < r.LANES; i++) {
+          const laneX = r.SHOULDER_WIDTH + i * r.LANE_WIDTH - 2;
+          for (let y = -period; y < vh + period; y += period) {
+            ctx.fillRect(laneX, y + this.offsetY, 4, r.DASH_LENGTH);
+          }
+        }
+      }
+    };
+
+    // 2. Player Entity
+    const Player = {
+      x: CONFIG.PLAYER.START_X,
+      y: CONFIG.PLAYER.START_Y,
+      width: CONFIG.PLAYER.WIDTH,
+      height: CONFIG.PLAYER.HEIGHT,
+      speed: CONFIG.PLAYER.BASE_SPEED,
+      tilt: 0,
+      health: CONFIG.PLAYER.MAX_HEALTH,
+      maxHealth: CONFIG.PLAYER.MAX_HEALTH,
+      armor: 1.0,
+      handling: CONFIG.PLAYER.LATERAL_SPEED,
+      maxSpeed: CONFIG.PLAYER.MAX_SPEED,
+      acceleration: CONFIG.PLAYER.ACCELERATION,
+      carData: null,
+      nitroTimer: 0,
+      spinTimer: 0, // при наезде на масляное пятно / яму
+
+      reset() {
+        const car = Storage.getSelectedCar();
+        this.carData = car;
+        this.x = (CONFIG.V_WIDTH - CONFIG.PLAYER.WIDTH) / 2;
+        this.y = CONFIG.PLAYER.START_Y;
+        this.speed = CONFIG.PLAYER.BASE_SPEED;
+        this.tilt = 0;
+        this.maxHealth = car.maxHealth;
+        this.health = car.maxHealth;
+        this.armor = car.armor;
+        this.handling = car.handling;
+        this.maxSpeed = car.maxSpeed;
+        this.acceleration = car.acceleration;
+        this.nitroTimer = 0;
+        this.spinTimer = 0;
+      },
+
+      takeDamage(amount) {
+        // Урон умножается на armor машины (у танка 0.35x, у стеклянной пушки 1.6x)
+        const actualDmg = Math.round(amount * this.armor);
+        this.health -= actualDmg;
+        if (this.health < 0) this.health = 0;
+        return actualDmg;
+      },
+
+      update(dt) {
+        // Nitro check
+        const isNitro = this.nitroTimer > 0;
+        if (isNitro) {
+          this.nitroTimer -= dt;
+        }
+
+        // Oil slick / pothole spin effect
+        if (this.spinTimer > 0) {
+          this.spinTimer -= dt;
+          this.speed = Math.max(CONFIG.PLAYER.BASE_SPEED * 0.5, this.speed - 300 * dt);
+        }
+
+        // Speed management
+        const maxSpd = isNitro ? (this.maxSpeed + CONFIG.PICKUPS.NITRO_SPEED_BOOST) : this.maxSpeed;
+        const targetBase = CONFIG.PLAYER.BASE_SPEED;
+
+        if (InputManager.keys.gas || isNitro) {
+          this.speed += (isNitro ? this.acceleration * 1.5 : this.acceleration) * dt;
+          if (this.speed > maxSpd) this.speed = maxSpd;
+        } else if (InputManager.keys.brake) {
+          this.speed -= this.acceleration * 1.8 * dt;
+          if (this.speed < targetBase * 0.4) this.speed = targetBase * 0.4;
+        } else {
+          // Inertia return towards base speed
+          if (this.speed > targetBase) {
+            this.speed -= CONFIG.PLAYER.INERTIA * dt;
+            if (this.speed < targetBase) this.speed = targetBase;
+          } else if (this.speed < targetBase) {
+            this.speed += CONFIG.PLAYER.INERTIA * dt;
+            if (this.speed > targetBase) this.speed = targetBase;
+          }
+        }
+
+        // Horizontal movement & body tilt
+        let targetTilt = 0;
+        let lateralSpeed = this.handling;
+        if (this.spinTimer > 0) {
+          // Неустойчивое управление при заносе
+          targetTilt = Math.sin(performance.now() * 0.03) * 0.35;
+          this.x += Math.sin(performance.now() * 0.02) * 160 * dt;
+        } else {
+          if (InputManager.keys.left) {
+            this.x -= lateralSpeed * dt;
+            targetTilt = -CONFIG.PLAYER.MAX_TILT;
+            ParticlePool.spawnTireSmoke(this.x + this.width * 0.8, this.y + this.height);
+          } else if (InputManager.keys.right) {
+            this.x += lateralSpeed * dt;
+            targetTilt = CONFIG.PLAYER.MAX_TILT;
+            ParticlePool.spawnTireSmoke(this.x + this.width * 0.2, this.y + this.height);
+          }
+        }
+
+        // Smooth tilt interpolation
+        this.tilt += (targetTilt - this.tilt) * Math.min(dt * 12, 1);
+
+        // Road boundaries clamp (with slight shoulder leeway)
+        const minX = CONFIG.ROAD.SHOULDER_WIDTH - 10;
+        const maxX = CONFIG.ROAD.SHOULDER_WIDTH + CONFIG.ROAD.ROAD_WIDTH - this.width + 10;
+        if (this.x < minX) this.x = minX;
+        if (this.x > maxX) this.x = maxX;
+
+        // Nitro exhaust sparks/flames
+        if (isNitro) {
+          ParticlePool.spawn(
+            this.x + this.width / 2 + (Math.random() - 0.5) * 12,
+            this.y + this.height,
+            (Math.random() - 0.5) * 20,
+            120 + Math.random() * 80,
+            0.15 + Math.random() * 0.1,
+            4 + Math.random() * 4,
+            Math.random() > 0.4 ? '#38bdf8' : '#0284c7'
+          );
+        }
+      },
+
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        ctx.rotate(this.tilt);
+
+        const w = this.width;
+        const h = this.height;
+        const hw = w / 2;
+        const hh = h / 2;
+        const car = this.carData || Storage.getSelectedCar();
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.beginPath();
+        ctx.roundRect(-hw + 3, -hh + 5, w, h, 8);
+        ctx.fill();
+
+        // Nitro aura shield
+        if (this.nitroTimer > 0) {
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+          ctx.lineWidth = 3.5;
+          ctx.shadowColor = '#06b6d4';
+          ctx.shadowBlur = 16;
+          ctx.beginPath();
+          ctx.roundRect(-hw - 5, -hh - 5, w + 10, h + 10, 12);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+
+        // Tires
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(-hw - 3, -hh + 10, 5, 18);
+        ctx.fillRect(hw - 2, -hh + 10, 5, 18);
+        ctx.fillRect(-hw - 3, hh - 26, 5, 20);
+        ctx.fillRect(hw - 2, hh - 26, 5, 20);
+
+        if (car.style === 'armored') {
+          // ТАНК / ТЯЖЕЛОВЕС
+          ctx.fillStyle = car.bodyColor;
+          ctx.beginPath();
+          ctx.roundRect(-hw - 2, -hh, w + 4, h, 6);
+          ctx.fill();
+
+          // Бронепластины
+          ctx.fillStyle = car.accentColor;
+          ctx.fillRect(-hw + 4, -hh + 6, w - 8, 14);
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-hw + 2, -hh + 24, w - 4, 6);
+
+          // Узкая бронебойная амбразура (окно)
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(-hw + 8, -hh + 34, w - 16, 12);
+
+          // Крыша и турель
+          ctx.fillStyle = car.roofColor;
+          ctx.fillRect(-hw + 6, -hh + 50, w - 12, 18);
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.arc(0, -hh + 59, 6, 0, Math.PI * 2);
+          ctx.fill();
+
+        } else if (car.style === 'speedster') {
+          // НЕОНОВЫЙ ФАНТОМ / СПИДСТЕР
+          ctx.fillStyle = car.bodyColor;
+          ctx.beginPath();
+          // Стреловидная аэродинамика
+          ctx.moveTo(0, -hh);
+          ctx.lineTo(hw, -hh + 20);
+          ctx.lineTo(hw, hh);
+          ctx.lineTo(-hw, hh);
+          ctx.lineTo(-hw, -hh + 20);
+          ctx.closePath();
+          ctx.fill();
+
+          // Неоновые полосы
+          ctx.fillStyle = car.accentColor;
+          ctx.fillRect(-2, -hh + 4, 4, h - 12);
+
+          // Кабина
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.roundRect(-hw + 6, -hh + 26, w - 12, 22, 6);
+          ctx.fill();
+
+          // Заднее антикрыло
+          ctx.fillStyle = car.accentColor;
+          ctx.fillRect(-hw - 3, hh - 6, w + 6, 4);
+
+        } else if (car.style === 'hyper') {
+          // ХИМЕРА / СУПЕРКАР
+          ctx.fillStyle = car.bodyColor;
+          ctx.beginPath();
+          ctx.roundRect(-hw, -hh, w, h, 10);
+          ctx.fill();
+
+          // Золотые акценты и аэро-диффузор
+          ctx.fillStyle = car.accentColor;
+          ctx.fillRect(-hw + 5, -hh + 4, w - 10, 10);
+          ctx.fillRect(-hw + 8, hh - 12, w - 16, 8);
+
+          // Футуристичное панорамное стекло
+          ctx.fillStyle = '#090d16';
+          ctx.beginPath();
+          ctx.roundRect(-hw + 5, -hh + 22, w - 10, 24, 6);
+          ctx.fill();
+
+          // Золотая крыша
+          ctx.fillStyle = car.roofColor;
+          ctx.fillRect(-hw + 8, -hh + 50, w - 16, 14);
+
+          // Неоновые задние сплиттеры
+          ctx.fillStyle = car.accentColor;
+          ctx.fillRect(-hw - 2, hh - 4, 6, 3);
+          ctx.fillRect(hw - 4, hh - 4, 6, 3);
+
+        } else {
+          // БАЗОВЫЙ И GT
+          ctx.fillStyle = car.bodyColor;
+          ctx.beginPath();
+          ctx.roundRect(-hw, -hh, w, h, 8);
+          ctx.fill();
+
+          // Полоса капота
+          ctx.fillStyle = car.accentColor;
+          ctx.fillRect(-hw + 7, -hh + 4, w - 14, 22);
+
+          // Лобовое стекло
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.roundRect(-hw + 6, -hh + 28, w - 12, 18, 4);
+          ctx.fill();
+
+          // Крыша
+          ctx.fillStyle = car.roofColor;
+          ctx.fillRect(-hw + 7, -hh + 48, w - 14, 16);
+
+          // Заднее стекло
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(-hw + 7, -hh + 65, w - 14, 8);
+        }
+
+        // Фары
+        ctx.fillStyle = '#fef08a';
+        ctx.shadowColor = '#facc15';
+        ctx.shadowBlur = 8;
+        ctx.fillRect(-hw + 4, -hh + 2, 8, 4);
+        ctx.fillRect(hw - 12, -hh + 2, 8, 4);
+
+        // Задние фонари
+        ctx.fillStyle = InputManager.keys.brake ? '#ff2222' : '#b91c1c';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = InputManager.keys.brake ? 12 : 5;
+        ctx.fillRect(-hw + 4, hh - 4, 8, 3);
+        ctx.fillRect(hw - 12, hh - 4, 8, 3);
+
+        ctx.restore();
+      }
+    };
+
+    /* ==========================================================================
+       МОДУЛЬ 6 (ЧАСТЬ 2): ТРАФИК И ПРЕПЯТСТВИЯ (ЗАРАНЕЕ СБАЛАНСИРОВАННАЯ ТРАССА)
+       ========================================================================== */
+    const TrafficManager = {
+      items: [],
+      furthestY: -300,
+
+      reset() {
+        this.items = [];
+        this.furthestY = 250;
+        this.seedRoadAhead(-3500);
+      },
+
+      seedRoadAhead(targetMinY) {
+        while (this.furthestY > targetMinY) {
+          this.generateTrackSegment();
+        }
+      },
+
+      generateTrackSegment() {
+        const gap = 280 + Math.random() * 180;
+        this.furthestY -= gap;
+        const segmentY = this.furthestY;
+        const pattern = Math.random();
+
+        if (pattern < 0.28) {
+          const lane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
+          this.spawnTrafficCar(lane, segmentY);
+        } else if (pattern < 0.48) {
+          const lane1 = Math.floor(Math.random() * CONFIG.ROAD.LANES);
+          let lane2 = (lane1 + 1 + Math.floor(Math.random() * (CONFIG.ROAD.LANES - 1))) % CONFIG.ROAD.LANES;
+          this.spawnTrafficCar(lane1, segmentY);
+          this.spawnTrafficCar(lane2, segmentY - 60);
+        } else if (pattern < 0.68) {
+          const lane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
+          const obsType = Math.random() < 0.4 ? 'cone' : (Math.random() < 0.7 ? 'barrier' : 'pothole');
+          this.spawnObstacle(obsType, lane, segmentY);
+        } else if (pattern < 0.86) {
+          const safeLane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
+          for (let l = 0; l < CONFIG.ROAD.LANES; l++) {
+            if (l === safeLane) continue;
+            const roll = Math.random();
+            if (roll < 0.55) {
+              this.spawnObstacle('barrier', l, segmentY);
+            } else if (roll < 0.8) {
+              this.spawnObstacle('cone', l, segmentY);
+            } else {
+              this.spawnTrafficCar(l, segmentY, 'truck');
+            }
+          }
+        } else {
+          const startLane = Math.random() < 0.5 ? 0 : 3;
+          this.spawnObstacle('barrier', startLane, segmentY);
+          this.spawnObstacle('cone', startLane === 0 ? 1 : 2, segmentY - 120);
+        }
+      },
+
+      spawnTrafficCar(lane, yPos, forcedType = null) {
+        const laneX = CONFIG.ROAD.SHOULDER_WIDTH + lane * CONFIG.ROAD.LANE_WIDTH;
+        const typeChoice = forcedType || CONFIG.TRAFFIC.TYPES[Math.floor(Math.random() * CONFIG.TRAFFIC.TYPES.length)].type;
+        const template = CONFIG.TRAFFIC.TYPES.find(t => t.type === typeChoice) || CONFIG.TRAFFIC.TYPES[0];
+        const speed = template.speedMin + Math.random() * (template.speedMax - template.speedMin);
+        const carX = laneX + (CONFIG.ROAD.LANE_WIDTH - template.width) / 2;
+
+        this.items.push({
+          category: 'car',
+          type: template.type,
+          x: carX,
+          y: yPos,
+          width: template.width,
+          height: template.height,
+          speed: speed,
+          color: template.color,
+          canChangeLane: template.canChangeLane,
+          isChangingLane: false,
+          targetX: carX,
+          aiTimer: Math.random() * 2
+        });
+      },
+
+      spawnObstacle(type, lane, yPos) {
+        const laneX = CONFIG.ROAD.SHOULDER_WIDTH + lane * CONFIG.ROAD.LANE_WIDTH;
+        let width = 42;
+        let height = 34;
+
+        if (type === 'barrier') {
+          width = 68;
+          height = 28;
+        } else if (type === 'cone') {
+          width = 28;
+          height = 28;
+        } else if (type === 'pothole') {
+          width = 46;
+          height = 36;
+        }
+
+        const objX = laneX + (CONFIG.ROAD.LANE_WIDTH - width) / 2;
+
+        this.items.push({
+          category: 'obstacle',
+          type: type,
+          x: objX,
+          y: yPos,
+          width: width,
+          height: height,
+          speed: 0
+        });
+      },
+
+      update(dt, playerSpeed) {
+        // Мир движется навстречу игроку: (playerSpeed - speed) смещает объекты вниз к экрану
+        for (let i = this.items.length - 1; i >= 0; i--) {
+          const item = this.items[i];
+          item.y += (playerSpeed - item.speed) * dt;
+
+          if (item.category === 'car' && item.canChangeLane && !item.isChangingLane) {
+            item.aiTimer = (item.aiTimer || 0) + dt;
+            if (item.aiTimer > 3.0) {
+              item.aiTimer = 0;
+              if (Math.random() < 0.35) {
+                const curLane = Math.floor((item.x - CONFIG.ROAD.SHOULDER_WIDTH) / CONFIG.ROAD.LANE_WIDTH);
+                const nextLane = curLane === 0 ? 1 : (curLane === CONFIG.ROAD.LANES - 1 ? curLane - 1 : (Math.random() > 0.5 ? curLane + 1 : curLane - 1));
+                item.targetX = CONFIG.ROAD.SHOULDER_WIDTH + nextLane * CONFIG.ROAD.LANE_WIDTH + (CONFIG.ROAD.LANE_WIDTH - item.width) / 2;
+                item.isChangingLane = true;
+              }
+            }
+          }
+
+          if (item.isChangingLane) {
+            const dx = item.targetX - item.x;
+            item.x += Math.sign(dx) * Math.min(Math.abs(dx), 95 * dt);
+            if (Math.abs(item.x - item.targetX) < 2) {
+              item.x = item.targetX;
+              item.isChangingLane = false;
+            }
+          }
+
+          // Удаляем объекты, ушедшие за экран вниз
+          if (item.y > CONFIG.V_HEIGHT + 200) {
+            this.items.splice(i, 1);
+          }
+        }
+
+        // Горизонт спавна смещается вниз вместе с движением
+        this.furthestY += playerSpeed * dt;
+        if (this.furthestY > -1500) {
+          this.seedRoadAhead(-3500);
+        }
+      },
+
+      draw(ctx) {
+        for (let i = 0; i < this.items.length; i++) {
+          const item = this.items[i];
+          if (item.y > CONFIG.V_HEIGHT + 100 || item.y < -150) continue;
+
+          ctx.save();
+          ctx.translate(item.x, item.y);
+
+          if (item.category === 'obstacle') {
+            if (item.type === 'barrier') {
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+              ctx.fillRect(4, 6, item.width, item.height);
+
+              ctx.fillStyle = '#475569';
+              ctx.beginPath();
+              ctx.roundRect(0, 0, item.width, item.height, 4);
+              ctx.fill();
+
+              ctx.save();
+              ctx.beginPath();
+              ctx.roundRect(2, 2, item.width - 4, item.height - 4, 3);
+              ctx.clip();
+              for (let bx = -10; bx < item.width + 20; bx += 14) {
+                ctx.fillStyle = ((bx / 14) % 2 === 0) ? '#ef4444' : '#f8fafc';
+                ctx.beginPath();
+                ctx.moveTo(bx, item.height);
+                ctx.lineTo(bx + 10, 0);
+                ctx.lineTo(bx + 18, 0);
+                ctx.lineTo(bx + 8, item.height);
+                ctx.closePath();
+                ctx.fill();
+              }
+              ctx.restore();
+
+            } else if (item.type === 'cone') {
+              ctx.fillStyle = 'rgba(0,0,0,0.3)';
+              ctx.beginPath();
+              ctx.ellipse(item.width/2, item.height - 2, 12, 5, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = '#ea580c';
+              ctx.fillRect(3, item.height - 7, item.width - 6, 6);
+
+              ctx.beginPath();
+              ctx.moveTo(item.width / 2, 2);
+              ctx.lineTo(item.width - 5, item.height - 6);
+              ctx.lineTo(5, item.height - 6);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.moveTo(item.width / 2 - 4, 11);
+              ctx.lineTo(item.width / 2 + 4, 11);
+              ctx.lineTo(item.width / 2 + 7, 18);
+              ctx.lineTo(item.width / 2 - 7, 18);
+              ctx.closePath();
+              ctx.fill();
+
+            } else if (item.type === 'pothole') {
+              ctx.fillStyle = '#090d16';
+              ctx.beginPath();
+              ctx.ellipse(item.width/2, item.height/2, item.width/2 - 2, item.height/2 - 2, 0.2, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.strokeStyle = 'rgba(6, 182, 212, 0.6)';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.ellipse(item.width/2 - 3, item.height/2 - 2, item.width/3, item.height/3, -0.3, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+
+          } else {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.roundRect(3, 4, item.width, item.height, 6);
+            ctx.fill();
+
+            if (item.type === 'truck') {
+              ctx.fillStyle = '#64748b';
+              ctx.beginPath();
+              ctx.roundRect(0, 0, item.width, item.height, 6);
+              ctx.fill();
+
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillRect(4, 30, item.width - 8, item.height - 36);
+
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(6, 6, item.width - 12, 14);
+
+              ctx.fillStyle = '#ef4444';
+              ctx.fillRect(4, item.height - 4, 6, 3);
+              ctx.fillRect(item.width - 10, item.height - 4, 6, 3);
+
+            } else {
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(-2, 10, 3, 14);
+              ctx.fillRect(item.width - 1, 10, 3, 14);
+              ctx.fillRect(-2, item.height - 20, 3, 14);
+              ctx.fillRect(item.width - 1, item.height - 20, 3, 14);
+
+              ctx.fillStyle = item.color;
+              ctx.beginPath();
+              ctx.roundRect(0, 0, item.width, item.height, 6);
+              ctx.fill();
+
+              ctx.fillStyle = '#0f172a';
+              ctx.beginPath();
+              ctx.roundRect(5, 20, item.width - 10, 15, 3);
+              ctx.fill();
+              ctx.fillRect(6, 45, item.width - 12, 8);
+
+              ctx.fillStyle = '#fef08a';
+              ctx.fillRect(4, 2, 6, 3);
+              ctx.fillRect(item.width - 10, 2, 6, 3);
+
+              ctx.fillStyle = '#ef4444';
+              ctx.fillRect(4, item.height - 3, 6, 3);
+              ctx.fillRect(item.width - 10, item.height - 3, 6, 3);
+            }
+          }
+          ctx.restore();
+        }
+      }
+    };
+
+    /* ==========================================================================
+       МОДУЛЬ 6 (ЧАСТЬ 3): МОНЕТЫ И СБОР ПРЕДМЕТОВ (СВЯЗКИ В РИСКОВАННЫХ МЕСТАХ)
+       ========================================================================== */
+    const PickupsManager = {
+      items: [],
+      furthestY: -200,
+
+      reset() {
+        this.items = [];
+        this.furthestY = 300;
+        this.seedPickupsAhead(-3500);
+      },
+
+      seedPickupsAhead(targetMinY) {
+        while (this.furthestY > targetMinY) {
+          const gap = 200 + Math.random() * 220;
+          this.furthestY -= gap;
+
+          const roll = Math.random();
+          if (roll < 0.65) {
+            const count = 3 + Math.floor(Math.random() * 3);
+            const lane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
+            const offsetInLane = Math.random() < 0.5 ? 8 : (CONFIG.ROAD.LANE_WIDTH - CONFIG.PICKUPS.WIDTH - 8);
+            const laneX = CONFIG.ROAD.SHOULDER_WIDTH + lane * CONFIG.ROAD.LANE_WIDTH + offsetInLane;
+
+            for (let c = 0; c < count; c++) {
+              this.items.push({
+                type: 'coin',
+                x: laneX,
+                y: this.furthestY - c * 48,
+                width: CONFIG.PICKUPS.WIDTH,
+                height: CONFIG.PICKUPS.HEIGHT,
+                animTime: c * 0.4
+              });
+            }
+            this.furthestY -= count * 48;
+
+          } else if (roll < 0.85) {
+            const lane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
+            const laneX = CONFIG.ROAD.SHOULDER_WIDTH + lane * CONFIG.ROAD.LANE_WIDTH + (CONFIG.ROAD.LANE_WIDTH - CONFIG.PICKUPS.WIDTH) / 2;
+            this.items.push({
+              type: 'fuel',
+              x: laneX,
+              y: this.furthestY,
+              width: CONFIG.PICKUPS.WIDTH,
+              height: CONFIG.PICKUPS.HEIGHT,
+              animTime: 0
+            });
+
+          } else {
+            const lane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
+            const laneX = CONFIG.ROAD.SHOULDER_WIDTH + lane * CONFIG.ROAD.LANE_WIDTH + (CONFIG.ROAD.LANE_WIDTH - CONFIG.PICKUPS.WIDTH) / 2;
+            this.items.push({
+              type: 'nitro',
+              x: laneX,
+              y: this.furthestY,
+              width: CONFIG.PICKUPS.WIDTH,
+              height: CONFIG.PICKUPS.HEIGHT,
+              animTime: 0
+            });
+          }
+        }
+      },
+
+      update(dt, playerSpeed) {
+        for (let i = this.items.length - 1; i >= 0; i--) {
+          const item = this.items[i];
+          item.y += playerSpeed * dt;
+          item.animTime += dt * 4;
+
+          if (item.y > CONFIG.V_HEIGHT + 50) {
+            this.items.splice(i, 1);
+          }
+        }
+
+        this.furthestY += playerSpeed * dt;
+        if (this.furthestY > -1500) {
+          this.seedPickupsAhead(-3500);
+        }
+      },
+
+      draw(ctx) {
+        for (let i = 0; i < this.items.length; i++) {
+          const item = this.items[i];
+          if (item.y > CONFIG.V_HEIGHT + 50 || item.y < -50) continue;
+
+          ctx.save();
+          ctx.translate(item.x + item.width / 2, item.y + item.height / 2);
+
+          const bounce = Math.sin(item.animTime) * 3;
+          ctx.translate(0, bounce);
+
+          if (item.type === 'coin') {
+            const scaleX = Math.cos(item.animTime);
+            ctx.scale(Math.abs(scaleX) < 0.1 ? 0.1 : scaleX, 1);
+
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(0, 0, 13, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#78350f';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('$', 0, 1);
+
+          } else if (item.type === 'fuel') {
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.roundRect(-11, -12, 22, 24, 4);
+            ctx.fill();
+
+            ctx.strokeStyle = '#15803d';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-11, -12, 22, 24);
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+', 0, 1);
+
+          } else if (item.type === 'nitro') {
+            ctx.fillStyle = '#06b6d4';
+            ctx.shadowColor = '#38bdf8';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.roundRect(-12, -12, 24, 24, 6);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚡', 0, 1);
+          }
+          ctx.restore();
+        }
+      }
+    };
+
+    /* ==========================================================================
+       МОДУЛЬ 7 (ЧАСТЬ 2): FINITE STATE MACHINE & MODALS (МЕНЮ, ГАРАЖ, МАГАЗИН)
+       ========================================================================== */
+    const STATES = {
+      BOOT: 'BOOT',
+      MENU: 'MENU',
+      GARAGE: 'GARAGE',
+      PLAYING: 'PLAYING',
+      PAUSED: 'PAUSED',
+      CRASH_FX: 'CRASH_FX',
+      GAME_OVER: 'GAME_OVER'
+    };
+
+    const GameFSM = {
+      state: STATES.BOOT,
+      score: 0,
+      distance: 0,
+      coinsSession: 0,
+      crashTimer: 0,
+
+      init() {
+        this.transitionTo(STATES.MENU);
+        document.getElementById('pause-btn').addEventListener('click', () => this.togglePause());
+        
+        const soundBtn = document.getElementById('sound-btn');
+        soundBtn.addEventListener('click', () => {
+          Storage.data.soundEnabled = !Storage.data.soundEnabled;
+          soundBtn.innerText = Storage.data.soundEnabled ? '🔊' : '🔇';
+          Storage.save();
+        });
+        soundBtn.innerText = Storage.data.soundEnabled ? '🔊' : '🔇';
+      },
+
+      transitionTo(newState) {
+        this.state = newState;
+        const modalLayer = document.getElementById('modal-layer');
+        const modalContent = document.getElementById('modal-content');
+        const curCar = Storage.getSelectedCar();
+
+        switch (newState) {
+          case STATES.MENU:
+            modalLayer.classList.remove('hidden');
+            modalContent.innerHTML = `
+              <h1 class="modal-title">SPEED RACER</h1>
+              <p class="modal-subtitle">Хардкорная гонка по шоссе: плотный трафик, препятствия и система классов машин.</p>
+              
+              <div style="margin-bottom:16px; background:rgba(15,23,42,0.6); padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
+                <div style="text-align:left;">
+                  <div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Выбранный автомобиль</div>
+                  <div style="font-size:15px; font-weight:800; color:#38bdf8;">${curCar.name} <span style="font-size:10px; color:${curCar.tagColor};">(${curCar.tag})</span></div>
+                </div>
+                <button class="primary-btn" id="open-garage-btn" style="width:auto; padding:8px 14px; font-size:12px; background:linear-gradient(135deg, #d97706, #f59e0b);">🚗 ГАРАЖ</button>
+              </div>
+
+              <div class="modal-stats">
+                <div class="stat-box">
+                  <div class="lbl">Рекорд очков</div>
+                  <div class="val">${Storage.data.highScore}</div>
+                </div>
+                <div class="stat-box">
+                  <div class="lbl">Баланс монет</div>
+                  <div class="val" style="color:#fbbf24;">🪙 ${Storage.data.totalCoins}</div>
+                </div>
+              </div>
+
+              <button class="primary-btn" id="start-btn">ПОЕХАЛИ !</button>
+              <div class="controls-hint">
+                Управление: <b>A/D</b> или <b>Стрелки</b> (руль), <b>W</b> (газ), <b>S</b> (тормоз)<br>
+                На смартфонах: экранные кнопки или тапы по сторонам экрана
+              </div>
+            `;
+            document.getElementById('start-btn').addEventListener('click', () => {
+              SoundEngine.resume();
+              this.startNewGame();
+            });
+            document.getElementById('open-garage-btn').addEventListener('click', () => {
+              this.transitionTo(STATES.GARAGE);
+            });
+            break;
+
+          case STATES.GARAGE:
+            modalLayer.classList.remove('hidden');
+            this.renderGarageModal(modalContent);
+            break;
+
+          case STATES.PLAYING:
+            modalLayer.classList.add('hidden');
+            break;
+
+          case STATES.PAUSED:
+            modalLayer.classList.remove('hidden');
+            modalContent.innerHTML = `
+              <h2 class="modal-title">ПАУЗА</h2>
+              <p class="modal-subtitle">Гонка приостановлена</p>
+              <div class="modal-stats">
+                <div class="stat-box">
+                  <div class="lbl">Текущий счет</div>
+                  <div class="val">${Math.floor(this.score)}</div>
+                </div>
+                <div class="stat-box">
+                  <div class="lbl">Дистанция</div>
+                  <div class="val">${Math.floor(this.distance)} м</div>
+                </div>
+              </div>
+              <button class="primary-btn" id="resume-btn">ПРОДОЛЖИТЬ</button>
+              <button class="secondary-btn" id="restart-from-pause">В ГЛАВНОЕ МЕНЮ</button>
+            `;
+            document.getElementById('resume-btn').addEventListener('click', () => this.transitionTo(STATES.PLAYING));
+            document.getElementById('restart-from-pause').addEventListener('click', () => this.transitionTo(STATES.MENU));
+            break;
+
+          case STATES.CRASH_FX:
+            this.crashTimer = 1.0;
+            SoundEngine.playCrash();
+            break;
+
+          case STATES.GAME_OVER:
+            if (this.score > Storage.data.highScore) {
+              Storage.data.highScore = Math.floor(this.score);
+            }
+            Storage.data.totalCoins += this.coinsSession;
+            Storage.save();
+
+            modalLayer.classList.remove('hidden');
+            modalContent.innerHTML = `
+              <h2 class="modal-title" style="color:#ef4444;">АВАРИЯ!</h2>
+              <p class="modal-subtitle">Автомобиль уничтожен на шоссе</p>
+              <div class="modal-stats">
+                <div class="stat-box">
+                  <div class="lbl">Ваш счет</div>
+                  <div class="val">${Math.floor(this.score)}</div>
+                </div>
+                <div class="stat-box">
+                  <div class="lbl">Рекорд</div>
+                  <div class="val">${Storage.data.highScore}</div>
+                </div>
+                <div class="stat-box">
+                  <div class="lbl">Дистанция</div>
+                  <div class="val">${Math.floor(this.distance)} м</div>
+                </div>
+                <div class="stat-box">
+                  <div class="lbl">Собрано монет</div>
+                  <div class="val" style="color:#fbbf24;">+${this.coinsSession}</div>
+                </div>
+              </div>
+              <button class="primary-btn" id="retry-btn">ИГРАТЬ СНОВА</button>
+              <button class="primary-btn gold-btn" id="garage-from-gameover" style="margin-top:10px;">🚗 ГАРАЖ / МАГАЗИН</button>
+              <button class="secondary-btn" id="menu-btn">ГЛАВНОЕ МЕНЮ</button>
+            `;
+            document.getElementById('retry-btn').addEventListener('click', () => this.startNewGame());
+            document.getElementById('garage-from-gameover').addEventListener('click', () => this.transitionTo(STATES.GARAGE));
+            document.getElementById('menu-btn').addEventListener('click', () => this.transitionTo(STATES.MENU));
+            break;
+        }
+      },
+
+      renderGarageModal(container) {
+        const owned = Storage.data.ownedCars || ['starter'];
+        const selected = Storage.data.selectedCar || 'starter';
+
+        let carsHtml = CARS.map(car => {
+          const isOwned = owned.includes(car.id);
+          const isSelected = selected === car.id;
+          
+          // Проценты для шкал (нормализация характеристик)
+          const spdPct = Math.min(100, Math.round((car.maxSpeed / 680) * 100));
+          const accPct = Math.min(100, Math.round((car.acceleration / 300) * 100));
+          const hndPct = Math.min(100, Math.round((car.handling / 400) * 100));
+          // Защита: чем меньше множитель armor, тем выше шкала защиты
+          const armPct = Math.min(100, Math.round((1.7 - car.armor) / 1.4 * 100));
+
+          let actionBtn = '';
+          if (isSelected) {
+            actionBtn = `<button class="car-btn car-btn-active">ВЫБРАНА</button>`;
+          } else if (isOwned) {
+            actionBtn = `<button class="car-btn car-btn-select" onclick="GameFSM.selectCar('${car.id}')">ВЫБРАТЬ</button>`;
+          } else {
+            const canAfford = Storage.data.totalCoins >= car.price;
+            actionBtn = `<button class="car-btn car-btn-buy" ${canAfford ? '' : 'style="opacity:0.5; cursor:not-allowed;"'} onclick="GameFSM.buyCar('${car.id}')">КУПИТЬ (${car.price} 🪙)</button>`;
+          }
+
+          return `
+            <div class="car-card ${isSelected ? 'selected' : ''}">
+              <div class="car-card-header">
+                <div class="car-card-title">
+                  <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${car.bodyColor}; border:1px solid #fff;"></span>
+                  ${car.name}
+                </div>
+                <span class="car-tag" style="background:${car.tagBg}; color:${car.tagColor};">${car.tag}</span>
+              </div>
+              <div class="car-desc">${car.desc}</div>
+              <div class="car-stats-list">
+                <div class="stat-row">
+                  <div class="stat-row-label"><span>Скорость</span> <span>${Math.round(car.maxSpeed * 0.45)} км/ч</span></div>
+                  <div class="stat-meter"><div class="stat-meter-fill meter-speed" style="width:${spdPct}%;"></div></div>
+                </div>
+                <div class="stat-row">
+                  <div class="stat-row-label"><span>Разгон</span> <span>${car.acceleration}</span></div>
+                  <div class="stat-meter"><div class="stat-meter-fill meter-accel" style="width:${accPct}%;"></div></div>
+                </div>
+                <div class="stat-row">
+                  <div class="stat-row-label"><span>Прочность / Броня</span> <span>${car.maxHealth} HP</span></div>
+                  <div class="stat-meter"><div class="stat-meter-fill meter-armor" style="width:${armPct}%;"></div></div>
+                </div>
+                <div class="stat-row">
+                  <div class="stat-row-label"><span>Маневр</span> <span>${car.handling}</span></div>
+                  <div class="stat-meter"><div class="stat-meter-fill meter-handling" style="width:${hndPct}%;"></div></div>
+                </div>
+              </div>
+              <div class="car-action-bar">
+                <div class="car-price">${car.price === 0 ? 'БЕСПЛАТНО' : `${car.price} 🪙`}</div>
+                ${actionBtn}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="garage-header">
+            <h2 class="modal-title" style="margin:0; font-size:20px;">ГАРАЖ & МАГАЗИН</h2>
+            <div class="garage-coins">🪙 <span id="garage-coins-val">${Storage.data.totalCoins}</span></div>
+          </div>
+          <div class="cars-grid">
+            ${carsHtml}
+          </div>
+          <button class="primary-btn" id="garage-back-btn">НАЗАД В МЕНЮ</button>
+        `;
+
+        document.getElementById('garage-back-btn').addEventListener('click', () => {
+          this.transitionTo(STATES.MENU);
+        });
+      },
+
+      buyCar(carId) {
+        const car = CARS.find(c => c.id === carId);
+        if (!car) return;
+        if (Storage.data.totalCoins >= car.price) {
+          Storage.data.totalCoins -= car.price;
+          if (!Storage.data.ownedCars.includes(carId)) {
+            Storage.data.ownedCars.push(carId);
+          }
+          Storage.data.selectedCar = carId;
+          Storage.save();
+          SoundEngine.playPickup();
+          this.renderGarageModal(document.getElementById('modal-content'));
+        }
+      },
+
+      selectCar(carId) {
+        if (Storage.data.ownedCars.includes(carId)) {
+          Storage.data.selectedCar = carId;
+          Storage.save();
+          SoundEngine.playPickup();
+          this.renderGarageModal(document.getElementById('modal-content'));
+        }
+      },
+
+      startNewGame() {
+        this.score = 0;
+        this.distance = 0;
+        this.coinsSession = 0;
+        Player.reset();
+        TrafficManager.reset();
+        PickupsManager.reset();
+        ParticlePool.clear();
+        InputManager.reset();
+        this.transitionTo(STATES.PLAYING);
+      },
+
+      togglePause() {
+        if (this.state === STATES.PLAYING) {
+          this.transitionTo(STATES.PAUSED);
+        } else if (this.state === STATES.PAUSED) {
+          this.transitionTo(STATES.PLAYING);
+        }
+      },
+
+      onCrash() {
+        ParticlePool.spawnExplosion(Player.x + Player.width / 2, Player.y + Player.height / 2, 40);
+        this.transitionTo(STATES.CRASH_FX);
+      }
+    };
+
+    /* ==========================================================================
+       МОДУЛЬ 8: GAME LOOP (requestAnimationFrame с фиксированным dt)
+       ========================================================================== */
+    let lastTime = performance.now();
+
+    // Cached HUD DOM references for zero allocations
+    const hudScore = document.getElementById('hud-score');
+    const hudCoins = document.getElementById('hud-coins');
+    const hudSpeed = document.getElementById('hud-speed');
+    const hudDist = document.getElementById('hud-distance');
+    const hudHealth = document.getElementById('hud-health');
+    const hudHealthTxt = document.getElementById('hud-health-txt');
+    const hudNitro = document.getElementById('hud-nitro');
+
+    function update(dt) {
+      if (GameFSM.state === STATES.PLAYING) {
+        Player.update(dt);
+        Road.update(dt, Player.speed);
+        TrafficManager.update(dt, Player.speed);
+        PickupsManager.update(dt, Player.speed);
+        ParticlePool.update(dt);
+
+        // Score & Distance progression
+        const speedKmH = Math.round(Player.speed * 0.45);
+        GameFSM.distance += (Player.speed * dt) * 0.1;
+        GameFSM.score += (Player.speed * dt * 0.05);
+
+        // Check Pickups Collision
+        for (let i = PickupsManager.items.length - 1; i >= 0; i--) {
+          const item = PickupsManager.items[i];
+          if (checkCollision(Player, item)) {
+            if (item.type === 'coin') {
+              GameFSM.score += CONFIG.PICKUPS.COIN_SCORE;
+              GameFSM.coinsSession += 1;
+              SoundEngine.playPickup();
+              ParticlePool.spawnExplosion(item.x + item.width / 2, item.y + item.height / 2, 8);
+            } else if (item.type === 'fuel') {
+              Player.health = Math.min(Player.maxHealth, Player.health + 35);
+              SoundEngine.playPickup();
+              ParticlePool.spawnExplosion(item.x + item.width / 2, item.y + item.height / 2, 10);
+            } else if (item.type === 'nitro') {
+              Player.nitroTimer = CONFIG.PICKUPS.NITRO_DURATION;
+              SoundEngine.playNitro();
+              ParticlePool.spawnExplosion(item.x + item.width / 2, item.y + item.height / 2, 20);
+            }
+            PickupsManager.items.splice(i, 1);
+          }
+        }
+
+        // Check Traffic & Obstacles Collisions
+        for (let i = TrafficManager.items.length - 1; i >= 0; i--) {
+          const target = TrafficManager.items[i];
+          if (checkCollision(Player, target)) {
+            if (Player.nitroTimer > 0) {
+              // В режиме Nitro машина разбивает любые препятствия без получения урона
+              ParticlePool.spawnExplosion(target.x + target.width / 2, target.y + target.height / 2, 25);
+              SoundEngine.playCrash();
+              TrafficManager.items.splice(i, 1);
+              GameFSM.score += 250;
+            } else {
+              // Расчет урона в зависимости от типа препятствия
+              let baseDamage = 35;
+              if (target.category === 'obstacle') {
+                if (target.type === 'cone') {
+                  baseDamage = 8;
+                  Player.speed = Math.max(CONFIG.PLAYER.BASE_SPEED * 0.7, Player.speed - 80);
+                } else if (target.type === 'barrier') {
+                  baseDamage = 60;
+                } else if (target.type === 'pothole') {
+                  baseDamage = 12;
+                  Player.spinTimer = 0.5; // потеря сцепления
+                }
+              } else if (target.category === 'car') {
+                if (target.type === 'truck') {
+                  baseDamage = 55;
+                } else if (target.type === 'sport') {
+                  baseDamage = 30;
+                } else {
+                  baseDamage = 38;
+                }
+              }
+
+              // Применяем урон с учетом брони
+              Player.takeDamage(baseDamage);
+              ParticlePool.spawnExplosion(target.x + target.width / 2, target.y + target.height / 2, 18);
+              SoundEngine.playCrash();
+
+              // Удаляем разрушенный объект (кроме ямы)
+              if (target.type !== 'pothole') {
+                TrafficManager.items.splice(i, 1);
+              }
+
+              if (Player.health <= 0) {
+                Player.health = 0;
+                GameFSM.onCrash();
+                break;
+              }
+            }
+          }
+        }
+
+        // Update Sound & HUD
+        const speedRatio = (Player.speed - CONFIG.PLAYER.BASE_SPEED) / (Player.maxSpeed - CONFIG.PLAYER.BASE_SPEED);
+        SoundEngine.updateEnginePitch(Math.max(0, speedRatio), true);
+
+        hudScore.innerText = Math.floor(GameFSM.score);
+        if (hudCoins) hudCoins.innerText = Storage.data.totalCoins + GameFSM.coinsSession;
+        hudSpeed.innerText = speedKmH;
+        hudDist.innerText = Math.floor(GameFSM.distance);
+        
+        const healthPct = Math.max(0, Math.min(100, Math.round((Player.health / Player.maxHealth) * 100)));
+        hudHealth.style.width = healthPct + '%';
+        if (hudHealthTxt) hudHealthTxt.innerText = `${Math.round(Player.health)}/${Player.maxHealth}`;
+
+        if (healthPct < 30) hudHealth.style.background = '#ef4444';
+        else if (healthPct < 60) hudHealth.style.background = '#f59e0b';
+        else hudHealth.style.background = 'linear-gradient(90deg, #22c55e, #10b981)';
+
+        if (Player.nitroTimer > 0) {
+          hudNitro.classList.add('nitro-active');
+        } else {
+          hudNitro.classList.remove('nitro-active');
+        }
+
+      } else if (GameFSM.state === STATES.CRASH_FX) {
+        ParticlePool.update(dt);
+        GameFSM.crashTimer -= dt;
+        SoundEngine.updateEnginePitch(0, false);
+        if (GameFSM.crashTimer <= 0) {
+          GameFSM.transitionTo(STATES.GAME_OVER);
+        }
+      } else {
+        SoundEngine.updateEnginePitch(0, false);
+      }
+    }
+
+    function render() {
+      CanvasScaler.applyTransform();
+      const ctx = CanvasScaler.ctx;
+
+      // Draw World
+      Road.draw(ctx);
+      PickupsManager.draw(ctx);
+      TrafficManager.draw(ctx);
+
+      if (GameFSM.state !== STATES.GAME_OVER) {
+        Player.draw(ctx);
+      }
+
+      ParticlePool.draw(ctx);
+    }
+
+    function gameLoop(currentTime) {
+      // Delta timing with clamping (Math.min(dt, 0.1)) to avoid jumps when tab is inactive
+      let dt = (currentTime - lastTime) / 1000;
+      dt = Math.min(dt, 0.1);
+      lastTime = currentTime;
+
+      update(dt);
+      render();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // BOOTSTRAP
+    window.addEventListener('DOMContentLoaded', () => {
+      CanvasScaler.init();
+      InputManager.init();
+      GameFSM.init();
+      requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>
