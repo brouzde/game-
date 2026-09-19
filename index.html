@@ -561,6 +561,39 @@
     .car-btn:active {
       transform: scale(0.95);
     }
+
+    /* Leaderboard Styles */
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px;
+      font-size: 13px;
+      text-align: left;
+    }
+    .leaderboard-table th {
+      padding: 6px 8px;
+      color: #94a3b8;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .leaderboard-table td {
+      padding: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .leaderboard-table tr.highlight-player {
+      background: rgba(6, 182, 212, 0.15);
+      font-weight: bold;
+    }
+    .leaderboard-rank {
+      width: 32px;
+      text-align: center;
+      font-weight: 800;
+    }
+    .rank-1 { color: #fbbf24; }
+    .rank-2 { color: #cbd5e1; }
+    .rank-3 { color: #d97706; }
   </style>
 </head>
 <body>
@@ -584,7 +617,7 @@
         <div class="hud-card">
           <span class="hud-label">Скорость</span>
           <span class="hud-value hud-val-speed"><span id="hud-speed">0</span> <small style="font-size:10px;">км/ч</small></span>
-          <div class="nitro-indicator" id="hud-nitro">⚡ NITRO ⚡</div>
+          <div class="nitro-indicator" id="hud-nitro">🛡️ SHIELD 🛡️</div>
         </div>
 
         <div class="hud-card">
@@ -673,7 +706,7 @@
         SPAWN_INTERVAL_MAX: 4.8,
         COIN_SCORE: 100,
         NITRO_DURATION: 4.0,
-        NITRO_SPEED_BOOST: 180
+        NITRO_SPEED_BOOST: 0
       },
       POOL_SIZES: {
         PARTICLES: 100
@@ -788,6 +821,15 @@
     const Storage = {
       data: {
         highScore: 0,
+        bestDistance: 0,
+        playerName: 'Игрок',
+        leaderboard: [
+          { name: 'TurboRacer', distance: 1540 },
+          { name: 'SpeedDemon', distance: 1120 },
+          { name: 'RoadKing', distance: 860 },
+          { name: 'HighwayGhost', distance: 650 },
+          { name: 'NightDrifter', distance: 420 }
+        ],
         totalCoins: 0,
         soundEnabled: true,
         controlType: 'buttons',
@@ -805,6 +847,21 @@
             if (!this.data.selectedCar) {
               this.data.selectedCar = 'starter';
             }
+            if (!Array.isArray(this.data.leaderboard) || this.data.leaderboard.length === 0) {
+              this.data.leaderboard = [
+                { name: 'TurboRacer', distance: 1540 },
+                { name: 'SpeedDemon', distance: 1120 },
+                { name: 'RoadKing', distance: 860 },
+                { name: 'HighwayGhost', distance: 650 },
+                { name: 'NightDrifter', distance: 420 }
+              ];
+            }
+            if (this.data.bestDistance === undefined) {
+              this.data.bestDistance = 0;
+            }
+            if (!this.data.playerName) {
+              this.data.playerName = 'Игрок';
+            }
           }
         } catch (e) {
           console.warn('Storage unavailable', e);
@@ -816,6 +873,26 @@
         } catch (e) {
           console.warn('Storage save failed', e);
         }
+      },
+      recordDistance(distanceMeters) {
+        const dist = Math.floor(distanceMeters);
+        if (dist > (this.data.bestDistance || 0)) {
+          this.data.bestDistance = dist;
+        }
+        const playerName = this.data.playerName || 'Игрок';
+        let found = this.data.leaderboard.find(e => e.name === playerName);
+        if (found) {
+          if (dist > found.distance) {
+            found.distance = dist;
+          }
+        } else {
+          this.data.leaderboard.push({ name: playerName, distance: dist });
+        }
+        this.data.leaderboard.sort((a, b) => b.distance - a.distance);
+        if (this.data.leaderboard.length > 8) {
+          this.data.leaderboard = this.data.leaderboard.slice(0, 8);
+        }
+        this.save();
       },
       getSelectedCar() {
         const found = CARS.find(c => c.id === this.data.selectedCar);
@@ -1370,11 +1447,11 @@
         }
 
         // Speed management
-        const maxSpd = isNitro ? (this.maxSpeed + CONFIG.PICKUPS.NITRO_SPEED_BOOST) : this.maxSpeed;
+        const maxSpd = this.maxSpeed;
         const targetBase = CONFIG.PLAYER.BASE_SPEED;
 
-        if (InputManager.keys.gas || isNitro) {
-          this.speed += (isNitro ? this.acceleration * 1.5 : this.acceleration) * dt;
+        if (InputManager.keys.gas) {
+          this.speed += this.acceleration * dt;
           if (this.speed > maxSpd) this.speed = maxSpd;
         } else if (InputManager.keys.brake) {
           this.speed -= this.acceleration * 1.8 * dt;
@@ -1886,7 +1963,7 @@
           this.furthestY -= gap;
 
           const roll = Math.random();
-          if (roll < 0.65) {
+          if (roll < 0.825) {
             const count = 3 + Math.floor(Math.random() * 3);
             const lane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
             const offsetInLane = Math.random() < 0.5 ? 8 : (CONFIG.ROAD.LANE_WIDTH - CONFIG.PICKUPS.WIDTH - 8);
@@ -1904,7 +1981,7 @@
             }
             this.furthestY -= count * 48;
 
-          } else if (roll < 0.85) {
+          } else if (roll < 0.925) {
             const lane = Math.floor(Math.random() * CONFIG.ROAD.LANES);
             const laneX = CONFIG.ROAD.SHOULDER_WIDTH + lane * CONFIG.ROAD.LANE_WIDTH + (CONFIG.ROAD.LANE_WIDTH - CONFIG.PICKUPS.WIDTH) / 2;
             this.items.push({
@@ -2020,6 +2097,7 @@
       BOOT: 'BOOT',
       MENU: 'MENU',
       GARAGE: 'GARAGE',
+      LEADERBOARD: 'LEADERBOARD',
       PLAYING: 'PLAYING',
       PAUSED: 'PAUSED',
       CRASH_FX: 'CRASH_FX',
@@ -2067,18 +2145,23 @@
                 <button class="primary-btn" id="open-garage-btn" style="width:auto; padding:8px 14px; font-size:12px; background:linear-gradient(135deg, #d97706, #f59e0b);">🚗 ГАРАЖ</button>
               </div>
 
-              <div class="modal-stats">
+              <div class="modal-stats" style="grid-template-columns: repeat(3, 1fr);">
                 <div class="stat-box">
                   <div class="lbl">Рекорд очков</div>
                   <div class="val">${Storage.data.highScore}</div>
                 </div>
                 <div class="stat-box">
-                  <div class="lbl">Баланс монет</div>
+                  <div class="lbl">Лучшая дист.</div>
+                  <div class="val" style="color:#38bdf8;">${Storage.data.bestDistance || 0} м</div>
+                </div>
+                <div class="stat-box">
+                  <div class="lbl">Монеты</div>
                   <div class="val" style="color:#fbbf24;">🪙 ${Storage.data.totalCoins}</div>
                 </div>
               </div>
 
               <button class="primary-btn" id="start-btn">ПОЕХАЛИ !</button>
+              <button class="secondary-btn" id="open-leaderboard-btn" style="margin-top:8px;">🏆 ТАБЛИЦА ЛИДЕРОВ</button>
               <div class="controls-hint">
                 Управление: <b>A/D</b> или <b>Стрелки</b> (руль), <b>W</b> (газ), <b>S</b> (тормоз)<br>
                 На смартфонах: экранные кнопки или тапы по сторонам экрана
@@ -2091,11 +2174,19 @@
             document.getElementById('open-garage-btn').addEventListener('click', () => {
               this.transitionTo(STATES.GARAGE);
             });
+            document.getElementById('open-leaderboard-btn').addEventListener('click', () => {
+              this.transitionTo(STATES.LEADERBOARD);
+            });
             break;
 
           case STATES.GARAGE:
             modalLayer.classList.remove('hidden');
             this.renderGarageModal(modalContent);
+            break;
+
+          case STATES.LEADERBOARD:
+            modalLayer.classList.remove('hidden');
+            this.renderLeaderboardModal(modalContent);
             break;
 
           case STATES.PLAYING:
@@ -2134,7 +2225,7 @@
               Storage.data.highScore = Math.floor(this.score);
             }
             Storage.data.totalCoins += this.coinsSession;
-            Storage.save();
+            Storage.recordDistance(this.distance);
 
             modalLayer.classList.remove('hidden');
             modalContent.innerHTML = `
@@ -2146,7 +2237,7 @@
                   <div class="val">${Math.floor(this.score)}</div>
                 </div>
                 <div class="stat-box">
-                  <div class="lbl">Рекорд</div>
+                  <div class="lbl">Рекорд очков</div>
                   <div class="val">${Storage.data.highScore}</div>
                 </div>
                 <div class="stat-box">
@@ -2154,15 +2245,17 @@
                   <div class="val">${Math.floor(this.distance)} м</div>
                 </div>
                 <div class="stat-box">
-                  <div class="lbl">Собрано монет</div>
-                  <div class="val" style="color:#fbbf24;">+${this.coinsSession}</div>
+                  <div class="lbl">Лучшая дист.</div>
+                  <div class="val" style="color:#38bdf8;">${Storage.data.bestDistance} м</div>
                 </div>
               </div>
               <button class="primary-btn" id="retry-btn">ИГРАТЬ СНОВА</button>
-              <button class="primary-btn gold-btn" id="garage-from-gameover" style="margin-top:10px;">🚗 ГАРАЖ / МАГАЗИН</button>
+              <button class="secondary-btn" id="leaderboard-from-gameover" style="margin-top:8px;">🏆 ТАБЛИЦА ЛИДЕРОВ</button>
+              <button class="primary-btn gold-btn" id="garage-from-gameover" style="margin-top:8px;">🚗 ГАРАЖ / МАГАЗИН</button>
               <button class="secondary-btn" id="menu-btn">ГЛАВНОЕ МЕНЮ</button>
             `;
             document.getElementById('retry-btn').addEventListener('click', () => this.startNewGame());
+            document.getElementById('leaderboard-from-gameover').addEventListener('click', () => this.transitionTo(STATES.LEADERBOARD));
             document.getElementById('garage-from-gameover').addEventListener('click', () => this.transitionTo(STATES.GARAGE));
             document.getElementById('menu-btn').addEventListener('click', () => this.transitionTo(STATES.MENU));
             break;
@@ -2242,6 +2335,47 @@
         `;
 
         document.getElementById('garage-back-btn').addEventListener('click', () => {
+          this.transitionTo(STATES.MENU);
+        });
+      },
+
+      renderLeaderboardModal(container) {
+        const board = Storage.data.leaderboard || [];
+        const currentPlayer = Storage.data.playerName || 'Игрок';
+
+        const rowsHtml = board.map((entry, idx) => {
+          const rank = idx + 1;
+          const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
+          const medal = rank === 1 ? '🥇 ' : (rank === 2 ? '🥈 ' : (rank === 3 ? '🥉 ' : ''));
+          const isCurrent = entry.name === currentPlayer;
+          return `
+            <tr class="${isCurrent ? 'highlight-player' : ''}">
+              <td class="leaderboard-rank ${rankClass}">${medal}${rank}</td>
+              <td style="color:${isCurrent ? '#38bdf8' : '#f8fafc'};">${entry.name}${isCurrent ? ' (Вы)' : ''}</td>
+              <td style="text-align:right; font-weight:800; color:#fbbf24;">${entry.distance} м</td>
+            </tr>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <h2 class="modal-title" style="margin-bottom:4px;">ТАБЛИЦА ЛИДЕРОВ</h2>
+          <p class="modal-subtitle">Топ пилотов по пройденной дистанции за один заезд</p>
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th style="width:40px; text-align:center;">Место</th>
+                <th>Имя игрока</th>
+                <th style="text-align:right;">Дистанция</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <button class="primary-btn" id="leaderboard-back-btn">НАЗАД В МЕНЮ</button>
+        `;
+
+        document.getElementById('leaderboard-back-btn').addEventListener('click', () => {
           this.transitionTo(STATES.MENU);
         });
       },
@@ -2360,21 +2494,21 @@
               let baseDamage = 35;
               if (target.category === 'obstacle') {
                 if (target.type === 'cone') {
-                  baseDamage = 8;
+                  baseDamage = 6;
                   Player.speed = Math.max(CONFIG.PLAYER.BASE_SPEED * 0.7, Player.speed - 80);
-                } else if (target.type === 'barrier') {
-                  baseDamage = 60;
                 } else if (target.type === 'pothole') {
-                  baseDamage = 12;
+                  baseDamage = 10;
                   Player.spinTimer = 0.5; // потеря сцепления
+                } else if (target.type === 'barrier') {
+                  baseDamage = 45;
                 }
               } else if (target.category === 'car') {
                 if (target.type === 'truck') {
-                  baseDamage = 55;
+                  baseDamage = 85;
                 } else if (target.type === 'sport') {
-                  baseDamage = 30;
+                  baseDamage = 28;
                 } else {
-                  baseDamage = 38;
+                  baseDamage = 35;
                 }
               }
 
